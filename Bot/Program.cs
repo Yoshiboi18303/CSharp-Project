@@ -4,9 +4,10 @@ using Discord.WebSocket;
 using Discord.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using NetCoreAudio;
-using MongoDB.Driver;
 using Lavalink4NET;
 using Lavalink4NET.DiscordNet;
+using CSharp_Project.Modules;
+using Npgsql;
 
 namespace CSharp_Project
 {
@@ -15,6 +16,7 @@ namespace CSharp_Project
         private DiscordSocketClient? _client;
         private CommandService? _commands;
         private IServiceProvider? _services;
+        private SqlHandler? _sqlHandler;
         
         // Please view: https://discordnet.dev/api/Discord.WebSocket.DiscordSocketConfig.html for more info.
         private readonly DiscordSocketConfig _config = new DiscordSocketConfig()
@@ -31,7 +33,6 @@ namespace CSharp_Project
         private static readonly string CurrentPath = "C:\\Users\\mom2b\\RiderProjects\\Discord Bot\\Bot";
 
         private readonly Player _player = new Player();
-        private MongoClient _mongoClient = new MongoClient(File.ReadAllText(CurrentPath + "\\connectionString.txt"));
         private SocketGuild? _supportGuild;
 
         public static void Main(string[] args)
@@ -42,6 +43,7 @@ namespace CSharp_Project
 
         private async Task MainAsync()
         {
+            _sqlHandler = new SqlHandler(await File.ReadAllTextAsync(CurrentPath + "\\connectionString.txt"));
             _client = new DiscordSocketClient(_config);
             _commands = new CommandService();
 
@@ -116,6 +118,11 @@ namespace CSharp_Project
             _supportGuild = _client!.GetGuild(833671287381032970);
             await _player.Play(CurrentPath + "\\Audio/startup.mp3");
             Console.WriteLine("The client is ready!");
+            NpgsqlCommand command = new NpgsqlCommand
+            {
+                Connection = _sqlHandler!.Connection,
+            };
+            _sqlHandler.DataReaderCommand(command);
         }
 
         private async Task HandleCommandAsync(SocketMessage arg)

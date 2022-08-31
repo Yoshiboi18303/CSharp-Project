@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Discord;
 using Discord.WebSocket;
 using Lavalink4NET;
@@ -8,7 +9,7 @@ using Lavalink4NET.Rest;
 
 namespace CSharp_Project.Modules;
 
-public class LavalinkPlayer
+public sealed class LavalinkPlayer
 {
     public LavalinkNode Node;
     public Lavalink4NET.Player.LavalinkPlayer Player;
@@ -22,7 +23,7 @@ public class LavalinkPlayer
 
     public LavalinkPlayer(DiscordSocketClient client, Lavalink4NET.Logging.ILogger? logger = null, IDiscordClientWrapper? clientWrapper = null)
     {
-        if (clientWrapper == null) clientWrapper = new DiscordClientWrapper(client);
+        clientWrapper ??= new DiscordClientWrapper(client);
         Node = new LavalinkNode(new LavalinkNodeOptions
         {
             // Free Lavalink Server, I'm fine to disclose the source.
@@ -35,16 +36,16 @@ public class LavalinkPlayer
     }
     
     
-    /**
-     * <summary>
-     * Adds whatever song is chosen by the end-user
-     * </summary>
-     * <param name="voiceChannel">
-     * The voice channel to use.
-     * </param>
-     * <param name="guild">
-     */
-    public async void PlaySong(SocketVoiceChannel voiceChannel, SocketGuild guild, SocketTextChannel textChannel, string query, SearchMode? mode = null)
+    /// <summary>
+    /// Finds and plays a song depending on the entered query.
+    /// </summary>
+    /// <param name="voiceChannel">The voice channel that the end-user is in.</param>
+    /// <param name="guild">The guild to lock onto.</param>
+    /// <param name="textChannel">The text channel for the end-user</param>
+    /// <param name="query">The end-users' query</param>
+    /// <param name="mode">The music service to search on.</param>
+    /// <param name="doSearch">Whether to search for the song and send the results for the end-user to choose from.</param>
+    public async void PlaySong(SocketVoiceChannel voiceChannel, SocketGuild guild, SocketTextChannel textChannel, string query, SearchMode? mode = null, bool doSearch = true)
     {
         ulong voiceChannelId = voiceChannel.Id;
         ulong guildId = guild.Id;
@@ -67,8 +68,11 @@ public class LavalinkPlayer
                 foreach (var result in tracks)
                 {
                     description += $"`{_trackNumber}` | **{result.Title}** - `{result.Duration}`\n";
+                    Debug.Assert(_trackNumbers != null, nameof(_trackNumbers) + " != null");
+#pragma warning disable CA1806
                     _trackNumbers.Append(_trackNumber);
                     _tracks.Append(result);
+#pragma warning restore CA1806
                     _trackNumber++;
                 }
 
