@@ -3,18 +3,32 @@ using Discord.Commands;
 using Discord.WebSocket;
 using Discord.Net;
 using Discord.Rest;
+using CSharp_Project.Modules;
+using Lavalink4NET.DiscordNet;
 
 namespace CSharp_Project.Modules
 {
     public class Commands : ModuleBase<SocketCommandContext>
     {
+        private LavalinkPlayer? _player;
+        #region info_commands
         [Command("ping")]
         public async Task Ping()
         {
             int ping = Context.Client.Latency;
             await ReplyAsync("Pong! **" + ping + "ms**");
         }
+        
+        [Command("userinfo")]
+        public async Task UserInfo(IGuildUser? user = null)
+        {
+            user ??= Context.User as IGuildUser;
+            
+            await ReplyAsync("Check the console!");
+        }
+        #endregion
 
+        #region moderation_commands
         [Command("ban")]
         [RequireUserPermission(GuildPermission.BanMembers, ErrorMessage = "You don't have the `BAN_MEMBERS` permission!")]
         [RequireBotPermission(GuildPermission.BanMembers, ErrorMessage = "I don't have the `BAN_MEMBERS` permission!")]
@@ -180,13 +194,58 @@ namespace CSharp_Project.Modules
 
             await ReplyAsync(embed: bansEmbed);
         }
+        #endregion
+        
+        #region music_commands
 
-        [Command("userinfo")]
-        public async Task UserInfo(IGuildUser? user = null)
+        [Command("play")]
+        [RequireBotPermission(GuildPermission.Connect,
+            ErrorMessage = "I don't have the `CONNECT` permission in this guild!")]
+        [RequireBotPermission(GuildPermission.Speak,
+            ErrorMessage = "I don't have the `SPEAK` permission in this guild!")]
+        public async Task PlaySong([Remainder] string? query = null)
         {
-            user ??= Context.User as IGuildUser;
-            
-            await ReplyAsync("Check the console!");
+            _player ??= new LavalinkPlayer(Context.Client, clientWrapper: new DiscordClientWrapper(Context.Client));
+            bool currentUserInVoiceChannel = false;
+            SocketVoiceChannel? currentVoiceChannel = null;
+            // List<IReadOnlyCollection<SocketGuildUser>> allConnectedUsers = new List<IReadOnlyCollection<SocketGuildUser>>();
+
+            foreach (SocketVoiceChannel voiceChannel in Context.Guild.VoiceChannels)
+            {
+                foreach (SocketGuildUser user in voiceChannel.ConnectedUsers)
+                {
+                    if (user.Id == Context.User.Id)
+                    {
+                        currentUserInVoiceChannel = true;
+                        currentVoiceChannel = voiceChannel;
+                    }
+                }
+            }
+
+            if (!currentUserInVoiceChannel)
+            {
+                Embed noVoiceChannelEmbed = new EmbedBuilder()
+                    .WithColor(Color.Red)
+                    .WithDescription("Please join a voice channel!")
+                    .Build();
+
+                await ReplyAsync(embed: noVoiceChannelEmbed);
+                return;
+            }
+
+            if (query == null)
+            {
+                Embed noQueryEmbed = new EmbedBuilder()
+                    .WithColor(Color.Red)
+                    .WithDescription("Please provide a query!")
+                    .Build();
+
+                await ReplyAsync(embed: noQueryEmbed);
+                return;
+            }
+
+            _player.PlaySong(currentVoiceChannel!, Context.Guild, Context.Channel as SocketTextChannel, query);
         }
+        #endregion
     }
 }

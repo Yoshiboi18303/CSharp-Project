@@ -8,18 +8,23 @@ using Lavalink4NET;
 using Lavalink4NET.DiscordNet;
 using CSharp_Project.Modules;
 using Npgsql;
+using System.Diagnostics;
 
 namespace CSharp_Project
 {
     class Program
     {
-        private DiscordSocketClient? _client;
+        #region publicFields
+        // public SqlHandler? SqlHandler;
+        #endregion
+        
+        #region privateFields
+        public DiscordSocketClient? Client;
         private CommandService? _commands;
         private IServiceProvider? _services;
-        private SqlHandler? _sqlHandler;
-        
+
         // Please view: https://discordnet.dev/api/Discord.WebSocket.DiscordSocketConfig.html for more info.
-        private readonly DiscordSocketConfig _config = new DiscordSocketConfig()
+        private readonly DiscordSocketConfig _config = new()
         {
             GatewayIntents = GatewayIntents.All,
             AlwaysDownloadUsers = true,
@@ -32,9 +37,10 @@ namespace CSharp_Project
         
         private static readonly string CurrentPath = "C:\\Users\\mom2b\\RiderProjects\\Discord Bot\\Bot";
 
-        private readonly Player _player = new Player();
+        private readonly Player _player = new();
         private SocketGuild? _supportGuild;
-
+        #endregion
+        
         public static void Main(string[] args)
         {
             Console.Clear();
@@ -43,13 +49,13 @@ namespace CSharp_Project
 
         private async Task MainAsync()
         {
-            _sqlHandler = new SqlHandler(await File.ReadAllTextAsync(CurrentPath + "\\connectionString.txt"));
-            _client = new DiscordSocketClient(_config);
-            _commands = new CommandService();
+            // SqlHandler = new SqlHandler(await File.ReadAllTextAsync(CurrentPath + "\\connectionString.txt"));
+            Client = new(_config);
+            _commands = new();
 
             // Initialize service provider
             _services = new ServiceCollection()
-                .AddSingleton(_client)
+                .AddSingleton(Client)
                 .AddSingleton(_commands)
                 .AddSingleton<IAudioService, LavalinkNode>()
                 .AddSingleton<IDiscordClientWrapper, DiscordClientWrapper>()
@@ -63,17 +69,17 @@ namespace CSharp_Project
                 .BuildServiceProvider();
 
             // Register event functions
-            _client.Log += Log;
-            _client.Ready += _client_Ready;
-            _client.JoinedGuild += Guild_Joined;
-            _client.UserIsTyping += Typing_Start;
+            Client.Log += Log;
+            Client.Ready += Client_Ready;
+            Client.JoinedGuild += Guild_Joined;
+            Client.UserIsTyping += Typing_Start;
 
             string token = await File.ReadAllTextAsync(CurrentPath + "\\token.txt");
 
             await RegisterCommandsAsync();
 
-            await _client.LoginAsync(TokenType.Bot, token);
-            await _client.StartAsync();
+            await Client.LoginAsync(TokenType.Bot, token);
+            await Client.StartAsync();
 
             // Block this task until the program is closed.
             await Task.Delay(-1);
@@ -91,9 +97,9 @@ namespace CSharp_Project
             Embed embed = new EmbedBuilder()
                 .WithColor(Color.Green)
                 .WithTitle("New Guild!")
-                .WithDescription(_client!.CurrentUser.Username + " was added to a new guild!")
+                .WithDescription(Client!.CurrentUser.Username + " was added to a new guild!")
                 .AddField("Guild Name", guild.Name, true)
-                .AddField("New Guild Count", _client.Guilds.Count, true)
+                .AddField("New Guild Count", Client.Guilds.Count, true)
                 .Build();
 
             await channel.SendMessageAsync(embed: embed);
@@ -101,7 +107,7 @@ namespace CSharp_Project
 
         private async Task RegisterCommandsAsync()
         {
-            _client!.MessageReceived += HandleCommandAsync;
+            Client!.MessageReceived += HandleCommandAsync;
             await _commands!.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
         }
 
@@ -113,16 +119,16 @@ namespace CSharp_Project
         }
 
         // Event that executes when the client is ready.
-        private async Task _client_Ready()
+        private async Task Client_Ready()
         {
-            _supportGuild = _client!.GetGuild(833671287381032970);
+            _supportGuild = Client!.GetGuild(833671287381032970);
             await _player.Play(CurrentPath + "\\Audio/startup.mp3");
             Console.WriteLine("The client is ready!");
-            NpgsqlCommand command = new NpgsqlCommand
-            {
-                Connection = _sqlHandler!.Connection,
-            };
-            _sqlHandler.DataReaderCommand(command);
+            // NpgsqlCommand command = new NpgsqlCommand
+            //{
+            //    Connection = SqlHandler!.Connection,
+            //};
+            //SqlHandler.DataReaderCommand(command);
         }
 
         private async Task HandleCommandAsync(SocketMessage arg)
@@ -130,7 +136,7 @@ namespace CSharp_Project
             SocketUserMessage? message = arg as SocketUserMessage;
             if (message == null) return;
             if (message.Author.IsBot) return;
-            SocketCommandContext context = new SocketCommandContext(_client, message);
+            SocketCommandContext context = new(Client, message);
 
             int argPos = 0;
             if (!message.HasStringPrefix(await File.ReadAllTextAsync(CurrentPath + "\\prefix.txt"), ref argPos)) return;

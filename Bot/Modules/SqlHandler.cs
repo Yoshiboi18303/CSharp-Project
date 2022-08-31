@@ -42,6 +42,11 @@ public sealed class SqlHandler
         return reader;
     }
 
+    /// <summary>
+    /// Executes your command and returns how many rows were affected.
+    /// </summary>
+    /// <param name="command">The command to execute.</param>
+    /// <returns>An int containing how many rows were affected.</returns>
     public int NonQueryCommand(NpgsqlCommand command)
     {
         int numberOfRowsAffected = command.ExecuteNonQuery();
@@ -64,6 +69,4 @@ public sealed class SqlHandler
         if (Connection == null) ThrowNonExistentException();
         Connection!.Close();
     }
-    
-    // Feel free to tell me how I can fix my code in chat, I'd be very appreciative of any feedback.
 }

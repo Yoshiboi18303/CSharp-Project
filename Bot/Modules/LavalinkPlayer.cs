@@ -3,23 +3,24 @@ using Discord;
 using Discord.WebSocket;
 using Lavalink4NET;
 using Lavalink4NET.DiscordNet;
+using Lavalink4NET.Events;
 using Lavalink4NET.Player;
-using Lavalink4NET.Rest;
 // ReSharper disable ReturnValueOfPureMethodIsNotUsed
 
 namespace CSharp_Project.Modules;
 
 public sealed class LavalinkPlayer
 {
-    public LavalinkNode Node;
+    public readonly LavalinkNode Node;
     public Lavalink4NET.Player.LavalinkPlayer Player;
     private DiscordSocketClient _client;
+    private SocketTextChannel? _textChannel;
     private int _trackNumber = 1;
-    private int[] _trackNumbers = new Int32[] { };
-    private bool _cancelCollector = false;
+    private int[] _trackNumbers = { };
+    private bool _cancelCollector;
     private LavalinkTrack _track;
-    private LavalinkTrack[] _tracks = new LavalinkTrack[] { };
-    private bool _trackReceived = false;
+    private LavalinkTrack[] _tracks = { };
+    private bool _trackReceived;
 
     public LavalinkPlayer(DiscordSocketClient client, Lavalink4NET.Logging.ILogger? logger = null, IDiscordClientWrapper? clientWrapper = null)
     {
@@ -27,15 +28,60 @@ public sealed class LavalinkPlayer
         Node = new LavalinkNode(new LavalinkNodeOptions
         {
             // Free Lavalink Server, I'm fine to disclose the source.
-            RestUri = "lavalink.oops.wtf",
+            RestUri = "https://lavalink.oops.wtf",
             Password = "www.freelavalink.ga",
             WebSocketUri = "wss://lavalink.oops.wtf"
         }, clientWrapper, logger);
         Node.InitializeAsync();
+        
+        // Set up events
+        Node.Connected += Node_Connected;
+        Node.PlayerConnected += Player_Connected;
+        Node.TrackStarted += Track_Started;
+        
+        // Add client to private field for later use
         _client = client;
     }
-    
-    
+
+    private async Task Track_Started(object sender, TrackStartedEventArgs eventArgs)
+    {
+        LavalinkTrack currentTrack = eventArgs.Player.CurrentTrack;
+        Embed trackStartedEmbed = new EmbedBuilder()
+            .WithColor(Color.Blue)
+            .WithTitle("Now Playing")
+            .WithFields(new[]{
+                new EmbedFieldBuilder()
+                .WithName("Title")
+                .WithValue(currentTrack.Title)
+                .WithIsInline(true),
+                new EmbedFieldBuilder()
+                .WithName("Duration")
+                .WithValue($"{currentTrack.Duration.Hours.ToString()}:{currentTrack.Duration.Minutes.ToString()}:{currentTrack.Duration.Seconds.ToString()}")
+                .WithIsInline(true)
+                })
+            .Build();
+    }
+
+    private async Task Player_Connected(object sender, PlayerConnectedEventArgs eventArgs)
+    {
+        Embed playerConnectedEmbed = new EmbedBuilder()
+            .WithColor(Color.Green)
+            .WithTitle("Player Connected")
+            .WithDescription("Player connected, ready to play music!")
+            .Build();
+        
+        Console.WriteLine($"Player in {_textChannel.Guild.Name} successfully connected!");
+        
+        await _textChannel?.SendMessageAsync(embed: playerConnectedEmbed);
+    }
+
+    private Task Node_Connected(object sender, ConnectedEventArgs eventArgs)
+    {
+        Console.WriteLine($"Connected to {eventArgs.Uri.Host} on port {eventArgs.Uri.Port.ToString()}");
+        return Task.CompletedTask;
+    }
+
+
     /// <summary>
     /// Finds and plays a song depending on the entered query.
     /// </summary>
@@ -43,22 +89,22 @@ public sealed class LavalinkPlayer
     /// <param name="guild">The guild to lock onto.</param>
     /// <param name="textChannel">The text channel for the end-user</param>
     /// <param name="query">The end-users' query</param>
-    /// <param name="mode">The music service to search on.</param>
     /// <param name="doSearch">Whether to search for the song and send the results for the end-user to choose from.</param>
-    public async void PlaySong(SocketVoiceChannel voiceChannel, SocketGuild guild, SocketTextChannel textChannel, string query, SearchMode? mode = null, bool doSearch = true)
+    public async void PlaySong(SocketVoiceChannel voiceChannel, SocketGuild guild, SocketTextChannel textChannel, string query, bool doSearch = true)
     {
         ulong voiceChannelId = voiceChannel.Id;
         ulong guildId = guild.Id;
+
+        _textChannel = textChannel;
 
         var player = Node.GetPlayer(guildId) ?? await Node.JoinAsync(guildId: guildId, voiceChannelId: voiceChannelId);
 
         Player = player;
 
-        if (mode == null)
-        {
-            string querySubstring = query[(query.StartsWith("http") ? 6 : 7)..];
-            if (querySubstring.StartsWith("youtube.com"))
+            string querySubstring = query[(query.StartsWith("http") ? 6 : query.StartsWith("https") ? 7 : 0)..];
+            if (querySubstring.StartsWith("youtube"))
             {
+
                 IEnumerable<LavalinkTrack> tracks = await Node.GetTracksAsync(query);
                 EmbedBuilder searchResultsEmbedBuilder =
                     new EmbedBuilder()
@@ -90,11 +136,6 @@ public sealed class LavalinkPlayer
 
                 await player.PlayAsync(_track);
             }
-        }
-        else
-        {
-            
-        }
     }
     
     // TODO Finish this method overload.
